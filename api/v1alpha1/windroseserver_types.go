@@ -11,6 +11,37 @@ const (
 	PhaseFailed  = "Failed"
 )
 
+// GatewayConfig configures Envoy Gateway exposure for direct game connections.
+// This matches the prd-apps game-servers pattern: Gateway + EnvoyProxy + TCPRoute/UDPRoute
+// fronting ClusterIP backend services.
+type GatewayConfig struct {
+	// Address is the external IP assigned to this server (Kube-VIP or MetalLB).
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^([0-9]{1,3}\.){3}[0-9]{1,3}$`
+	Address string `json:"address"`
+
+	// ClassName is the GatewayClass used for the Envoy Gateway controller.
+	// +kubebuilder:default="envoy"
+	// +optional
+	ClassName string `json:"className,omitempty"`
+
+	// GatewayName overrides the Gateway resource name.
+	// Default: {base-name}-gateway where base-name strips a trailing "-server" suffix.
+	// +optional
+	GatewayName string `json:"gatewayName,omitempty"`
+
+	// EnvoyProxyName overrides the EnvoyProxy resource name.
+	// Default: game-{base-name}-kubevip.
+	// +optional
+	EnvoyProxyName string `json:"envoyProxyName,omitempty"`
+
+	// ExternalTrafficPolicy for the Envoy LoadBalancer service.
+	// +kubebuilder:validation:Enum=Cluster;Local
+	// +kubebuilder:default=Cluster
+	// +optional
+	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
+}
+
 // WindroseServerSpec defines the desired state of a Windrose dedicated game server.
 // Settings map to ServerDescription.json fields documented at
 // https://playwindrose.com/dedicated-server-guide and the official Docker image
@@ -21,13 +52,29 @@ type WindroseServerSpec struct {
 	// +optional
 	ServerImage string `json:"serverImage,omitempty"`
 
+	// ImagePullPolicy for the game server container.
+	// +kubebuilder:default=IfNotPresent
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSecrets for private registries.
+	// +optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// NodeSelector pins the game server pod to specific nodes.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Gateway configures Envoy Gateway exposure (required).
+	Gateway GatewayConfig `json:"gateway"`
+
 	// InviteCode is used when UseDirectConnection is false. Minimum 6 characters.
 	// +kubebuilder:validation:MinLength=6
 	// +kubebuilder:validation:MaxLength=32
 	// +optional
 	InviteCode string `json:"inviteCode,omitempty"`
 
-	// UseDirectConnection enables direct IP connections (recommended for Kubernetes).
+	// UseDirectConnection enables direct IP connections (required for Kubernetes).
 	// +kubebuilder:default=true
 	// +optional
 	UseDirectConnection *bool `json:"useDirectConnection,omitempty"`
@@ -87,18 +134,6 @@ type WindroseServerSpec struct {
 	// Resources for the game server container. Defaults match Windrose docs for 4 players.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// ServiceType exposes the game port outside the cluster.
-	// +kubebuilder:validation:Enum=LoadBalancer;NodePort;ClusterIP
-	// +kubebuilder:default=LoadBalancer
-	// +optional
-	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
-
-	// NodePort is used when ServiceType is NodePort. Must be in range 30000-32767 when set.
-	// +kubebuilder:validation:Minimum=30000
-	// +kubebuilder:validation:Maximum=32767
-	// +optional
-	NodePort int32 `json:"nodePort,omitempty"`
 }
 
 // WindroseServerStatus defines the observed state of WindroseServer.
@@ -137,6 +172,7 @@ type WindroseServerStatus struct {
 // +kubebuilder:resource:shortName=ws
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Ready",type=boolean,JSONPath=`.status.ready`
+// +kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.status.connectionAddress`
 // +kubebuilder:printcolumn:name="Port",type=integer,JSONPath=`.status.connectionPort`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

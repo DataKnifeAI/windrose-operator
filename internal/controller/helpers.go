@@ -2,10 +2,14 @@ package controller
 
 import (
 	"encoding/json"
+	"strings"
 
 	windrosev1alpha1 "github.com/DataKnifeAI/windrose-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 )
 
 type serverDescriptionFile struct {
@@ -27,6 +31,18 @@ type serverDescriptionPersistent struct {
 	AutoLoadLatestBackupIfHasBroken bool   `json:"AutoLoadLatestBackupIfHasBroken"`
 }
 
+type derivedNames struct {
+	pvcName        string
+	configMapName  string
+	deploymentName string
+	serviceName    string
+	envoyService   string
+	gatewayName    string
+	envoyProxyName string
+	tcpRouteName   string
+	udpRouteName   string
+}
+
 func boolValue(value *bool, fallback bool) bool {
 	if value == nil {
 		return fallback
@@ -34,11 +50,68 @@ func boolValue(value *bool, fallback bool) bool {
 	return *value
 }
 
+func gatewayBaseName(name string) string {
+	if strings.HasSuffix(name, "-server") {
+		return strings.TrimSuffix(name, "-server")
+	}
+	return name
+}
+
+func deriveNames(server *windrosev1alpha1.WindroseServer) derivedNames {
+	base := gatewayBaseName(server.Name)
+	names := derivedNames{
+		pvcName:        server.Name + "-files",
+		configMapName:  server.Name + "-config",
+		deploymentName: server.Name,
+		serviceName:    server.Name,
+		envoyService:   server.Name + "-envoy",
+		gatewayName:    base + "-gateway",
+		envoyProxyName: "game-" + base + "-kubevip",
+		tcpRouteName:   base + "-game-tcp",
+		udpRouteName:   base + "-game-udp",
+	}
+	if server.Spec.Gateway.GatewayName != "" {
+		names.gatewayName = server.Spec.Gateway.GatewayName
+	}
+	if server.Spec.Gateway.EnvoyProxyName != "" {
+		names.envoyProxyName = server.Spec.Gateway.EnvoyProxyName
+	}
+	return names
+}
+
 func serverImage(spec windrosev1alpha1.WindroseServerSpec) string {
 	if spec.ServerImage != "" {
 		return spec.ServerImage
 	}
 	return defaultServerImage
+}
+
+func imagePullPolicy(spec windrosev1alpha1.WindroseServerSpec) corev1.PullPolicy {
+	if spec.ImagePullPolicy != "" {
+		return spec.ImagePullPolicy
+	}
+	return corev1.PullIfNotPresent
+}
+
+func gatewayClassName(spec windrosev1alpha1.WindroseServerSpec) string {
+	if spec.Gateway.ClassName != "" {
+		return spec.Gateway.ClassName
+	}
+	return defaultGatewayClassName
+}
+
+func externalTrafficPolicy(spec windrosev1alpha1.WindroseServerSpec) corev1.ServiceExternalTrafficPolicy {
+	if spec.Gateway.ExternalTrafficPolicy != "" {
+		return spec.Gateway.ExternalTrafficPolicy
+	}
+	return corev1.ServiceExternalTrafficPolicyCluster
+}
+
+func envoyExternalTrafficPolicy(spec windrosev1alpha1.WindroseServerSpec) egv1a1.ServiceExternalTrafficPolicy {
+	if externalTrafficPolicy(spec) == corev1.ServiceExternalTrafficPolicyLocal {
+		return egv1a1.ServiceExternalTrafficPolicyLocal
+	}
+	return egv1a1.ServiceExternalTrafficPolicyCluster
 }
 
 func directConnectionPort(spec windrosev1alpha1.WindroseServerSpec) int32 {
@@ -60,13 +133,6 @@ func storageSize(spec windrosev1alpha1.WindroseServerSpec) string {
 		return spec.StorageSize
 	}
 	return defaultStorageSize
-}
-
-func serviceType(spec windrosev1alpha1.WindroseServerSpec) corev1.ServiceType {
-	if spec.ServiceType != "" {
-		return spec.ServiceType
-	}
-	return corev1.ServiceTypeLoadBalancer
 }
 
 func directConnectionProxyAddress(spec windrosev1alpha1.WindroseServerSpec) string {
@@ -124,10 +190,23 @@ func buildServerDescription(spec windrosev1alpha1.WindroseServerSpec) ([]byte, e
 	return json.MarshalIndent(doc, "", "  ")
 }
 
-func resourceNames(name string) (pvcName, configMapName, deploymentName, serviceName string) {
-	return name + "-saves", name + "-config", name, name
-}
-
 func resourceQuantity(value string) resource.Quantity {
 	return resource.MustParse(value)
+}
+
+func gameServicePorts(port int32) []corev1.ServicePort {
+	return []corev1.ServicePort{
+		{
+			Name:       "game-tcp",
+			Port:       port,
+			TargetPort: intstr.FromInt32(port),
+			Protocol:   corev1.ProtocolTCP,
+		},
+		{
+			Name:       "game-udp",
+			Port:       port,
+			TargetPort: intstr.FromInt32(port),
+			Protocol:   corev1.ProtocolUDP,
+		},
+	}
 }

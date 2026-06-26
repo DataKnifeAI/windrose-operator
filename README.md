@@ -2,21 +2,45 @@
 
 Kubernetes operator for [Windrose](https://playwindrose.com) dedicated game servers using the official Linux container image [`windroseserver/windroseserver`](https://hub.docker.com/r/windroseserver/windroseserver).
 
-This project complements [windrose-server-k8s](https://github.com/DataKnifeAI/windrose-server-k8s), which packages a Wine-based server image. The operator targets the native Linux image published by the Windrose team.
+This project complements [windrose-server-k8s](https://github.com/DataKnifeAI/windrose-server-k8s), which packages a Wine-based server image. The operator targets the native Linux image published by the Windrose team and matches the **Envoy Gateway** exposure pattern used on DataKnife `prd-apps` clusters.
 
 ## Features
 
 - Declarative `WindroseServer` custom resource
-- Manages Deployment, Service, PVC, and `ServerDescription.json` ConfigMap
-- Direct IP connection mode enabled by default (required for Kubernetes)
+- **Envoy Gateway** exposure via Gateway + EnvoyProxy + TCPRoute/UDPRoute (matches production `game-servers` namespace)
+- Official `windroseserver/windroseserver` image with correct mount paths
+- ClusterIP backend services (`{name}` and `{name}-envoy`)
 - Persistent world saves on a PVC
-- Resource defaults aligned with Windrose hardware guidance (4-player profile)
+- `ServerDescription.json` managed via ConfigMap
+
+## Architecture
+
+```
+Clients → Kube-VIP IP (spec.gateway.address)
+              ↓
+      {base}-gateway (Envoy Gateway)
+              ↓
+   TCPRoute / UDPRoute → {name}-envoy (ClusterIP)
+              ↓
+      {name} Deployment (windroseserver/windroseserver)
+```
+
+For a CR named `windrose-server`, resource names match the existing production layout:
+
+| Resource | Name |
+|----------|------|
+| Gateway | `windrose-gateway` |
+| EnvoyProxy | `game-windrose-kubevip` |
+| TCPRoute | `windrose-game-tcp` |
+| UDPRoute | `windrose-game-udp` |
+| Backend Service | `windrose-server-envoy` |
 
 ## Prerequisites
 
 - Kubernetes 1.28+
+- [Envoy Gateway](https://gateway.envoyproxy.io/) with `GatewayClass` `envoy`
 - A StorageClass for persistent volumes (35 Gi minimum recommended)
-- LoadBalancer or NodePort support for exposing game traffic (TCP + UDP on the same port)
+- A dedicated Kube-VIP / MetalLB IP per server (`spec.gateway.address`)
 
 ## Quick start
 
@@ -26,7 +50,7 @@ Install the CRD and operator:
 kubectl apply -k config/default
 ```
 
-Create a server:
+Create a server (adjust the gateway IP and storage class for your cluster):
 
 ```shell
 kubectl apply -f config/samples/windrose_v1alpha1_windroseserver.yaml
@@ -35,24 +59,22 @@ kubectl apply -f config/samples/windrose_v1alpha1_windroseserver.yaml
 Watch status:
 
 ```shell
-kubectl get windroseserver my-windrose-server -w
+kubectl get windroseserver windrose-server -n game-servers -w
 ```
 
-Connect in-game with **Play → Connect to Server** using the LoadBalancer address and port from `.status.connectionAddress` and `.status.connectionPort` when `useDirectConnection: true`.
+Connect in-game with **Play → Connect to Server** using `.status.connectionAddress` and `.status.connectionPort`.
 
 ## WindroseServer spec
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | `serverImage` | `windroseserver/windroseserver:latest` | Official Linux server image |
-| `useDirectConnection` | `true` | Direct IP connections (recommended on Kubernetes) |
+| `gateway.address` | *(required)* | External IP (e.g. `192.168.14.186`) |
+| `gateway.className` | `envoy` | GatewayClass name |
+| `useDirectConnection` | `true` | Direct IP connections |
 | `directConnectionServerPort` | `7777` | Game port (TCP + UDP) |
-| `serverName` | | Display name in the server browser |
-| `password` | | Optional server password |
-| `maxPlayerCount` | `4` | Maximum simultaneous players |
-| `userSelectedRegion` | | `SEA`, `CIS`, or `EU`; empty auto-selects |
 | `storageSize` | `35Gi` | PVC size for world saves |
-| `serviceType` | `LoadBalancer` | `LoadBalancer`, `NodePort`, or `ClusterIP` |
+| `storageClassName` | | StorageClass for saves PVC |
 
 Settings map to [`ServerDescription.json`](https://playwindrose.com/dedicated-server-guide) fields. World configuration (`WorldDescription.json`) is created by the server on first boot and stored on the PVC.
 
@@ -68,28 +90,12 @@ docker run --user ue_user --name WindroseServer \
   windroseserver/windroseserver:latest
 ```
 
-## Hardware guidance
-
-| Players | CPU | RAM | Storage |
-|---------|-----|-----|---------|
-| 2 | 2 cores @ 3.2 GHz | 8 GB | 35 GB SSD |
-| 4 | 2 cores @ 3.2 GHz | 12 GB | 35 GB SSD |
-| 10 | 2 cores @ 3.2 GHz | 16 GB | 35 GB SSD |
-
-Adjust `spec.resources` on the `WindroseServer` CR for larger player counts.
-
 ## Development
 
 ```shell
 make generate manifests
 make test
 make run
-```
-
-Build the operator image:
-
-```shell
-make docker-build IMG=harbor.dataknife.net/library/windrose-operator:latest
 ```
 
 ## Related projects

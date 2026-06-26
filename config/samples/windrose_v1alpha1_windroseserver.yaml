@@ -1,14 +1,21 @@
 apiVersion: windrose.dataknife.ai/v1alpha1
 kind: WindroseServer
 metadata:
-  name: my-windrose-server
-  namespace: default
+  name: windrose-server
+  namespace: game-servers
 spec:
   serverImage: windroseserver/windroseserver:latest
+  gateway:
+    address: 192.168.14.186
+    className: envoy
   useDirectConnection: true
   directConnectionServerPort: 7777
+  directConnectionProxyAddress: 0.0.0.0
   serverName: DataKnife Windrose
   maxPlayerCount: 4
   userSelectedRegion: EU
   storageSize: 35Gi
-  serviceType: LoadBalancer
+  storageClassName: truenas-csi-nfs
+  nodeSelector:
+    kubernetes.io/os: linux
+    kubernetes.io/arch: amd64
