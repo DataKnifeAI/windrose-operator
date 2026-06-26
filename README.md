@@ -214,15 +214,19 @@ docker run --user ue_user --name WindroseServer \
 
 ## Development
 
-Requires Go 1.25+.
+Requires Go 1.25+ and [golangci-lint](https://golangci-lint.run/) for local linting.
 
 ```shell
 make generate manifests   # CRD, RBAC, deepcopy
-make test
-make build              # bin/manager
-make run                # local controller
+make test                 # unit tests with race detector
+make lint                 # golangci-lint
+make ci                   # generate, vet, lint, and test
+make build                # bin/manager
+make run                  # local controller
 make docker-build IMG=harbor.dataknife.net/library/windrose-operator:latest
 ```
+
+CI runs lint and tests on every push and pull request.
 
 ## Related projects
 
