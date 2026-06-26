@@ -231,6 +231,7 @@ CI runs lint and tests on every push and pull request.
 ## Related projects
 
 - [DataKnifeAI/windrose-server-k8s](https://github.com/DataKnifeAI/windrose-server-k8s) — Wine-based image and Kustomize manifests
+- [GitLab mirror](docs/GITLAB_MIRROR.md) — CI builds `harbor.dataknife.net/library/windrose-operator`
 - [Windrose Dedicated Server Guide](https://playwindrose.com/dedicated-server-guide)
 - [windroseserver/windroseserver on Docker Hub](https://hub.docker.com/r/windroseserver/windroseserver)
 
