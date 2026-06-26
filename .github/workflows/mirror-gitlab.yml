@@ -1,0 +1,62 @@
+# Mirror to GitLab after CI; GitLab CI publishes the operator image to Harbor.
+# Configure HARBOR_* variables on the GitLab project. GitHub: GITLAB_TOKEN for push only.
+name: Mirror to GitLab
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLAB_MIRROR_PATH: dk-raas/dkai/game-servers/windrose-operator
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.4.0
+
+      - name: make ci
+        run: make ci
+
+  mirror:
+    name: Push to GitLab
+    runs-on: ubuntu-latest
+    needs: [verify]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote remove gitlab 2>/dev/null || true
+          git remote add gitlab "https://gitlab.com/${{ env.GITLAB_MIRROR_PATH }}.git"
+          git config credential.helper '!f() { echo "username=oauth2"; echo "password=${GITLAB_TOKEN}"; }; f'
+          git fetch gitlab main 2>/dev/null || true
+          git push gitlab HEAD:main --force
