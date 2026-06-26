@@ -75,6 +75,32 @@ Connect in-game with **Play → Connect to Server** using `.status.connectionAdd
 | `directConnectionServerPort` | `7777` | Game port (TCP + UDP) |
 | `storageSize` | `35Gi` | PVC size for world saves |
 | `storageClassName` | | StorageClass for saves PVC |
+| `maxPlayerCount` | `4` | Max players; also selects pod resources when `resources` is unset |
+| `resources` | auto | Override pod CPU/memory (see table below) |
+
+### Auto-selected pod resources
+
+When `spec.resources` is omitted, CPU and memory are derived from `maxPlayerCount` using [Windrose hardware guidance](https://playwindrose.com/dedicated-server-guide):
+
+| Players | CPU request | Memory request | CPU limit | Memory limit |
+|---------|-------------|----------------|-----------|--------------|
+| 1–2 | 2 | 8Gi | 4 | 10Gi |
+| 3–4 | 2 | 12Gi | 4 | 16Gi |
+| 5–32 | 2 | 16Gi | 4 | 16Gi |
+
+To override, set `spec.resources` explicitly:
+
+```yaml
+spec:
+  maxPlayerCount: 10
+  resources:
+    requests:
+      cpu: "2"
+      memory: 16Gi
+    limits:
+      cpu: "4"
+      memory: 20Gi
+```
 
 Settings map to [`ServerDescription.json`](https://playwindrose.com/dedicated-server-guide) fields. World configuration (`WorldDescription.json`) is created by the server on first boot and stored on the PVC.
 

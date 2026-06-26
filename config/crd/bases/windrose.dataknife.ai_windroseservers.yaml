@@ -144,8 +144,9 @@ spec:
                 type: string
               maxPlayerCount:
                 default: 4
-                description: MaxPlayerCount is the maximum number of simultaneous
-                  players.
+                description: |-
+                  MaxPlayerCount is the maximum number of simultaneous players.
+                  When spec.resources is unset, pod CPU/memory are auto-selected from this value.
                 format: int32
                 maximum: 32
                 minimum: 1
@@ -165,8 +166,9 @@ spec:
                   a public server.
                 type: string
               resources:
-                description: Resources for the game server container. Defaults match
-                  Windrose docs for 4 players.
+                description: |-
+                  Resources for the game server container.
+                  When set, overrides auto-selection based on maxPlayerCount.
                 properties:
                   claims:
                     description: |-

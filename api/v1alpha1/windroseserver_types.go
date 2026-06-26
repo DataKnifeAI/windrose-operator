@@ -100,6 +100,7 @@ type WindroseServerSpec struct {
 	Password string `json:"password,omitempty"`
 
 	// MaxPlayerCount is the maximum number of simultaneous players.
+	// When spec.resources is unset, pod CPU/memory are auto-selected from this value.
 	// +kubebuilder:default=4
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=32
@@ -131,7 +132,8 @@ type WindroseServerSpec struct {
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
 
-	// Resources for the game server container. Defaults match Windrose docs for 4 players.
+	// Resources for the game server container.
+	// When set, overrides auto-selection based on maxPlayerCount.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }

@@ -153,14 +153,31 @@ func defaultResources(spec windrosev1alpha1.WindroseServerSpec) corev1.ResourceR
 	if spec.Resources.Requests != nil || spec.Resources.Limits != nil {
 		return spec.Resources
 	}
+	return resourcesForPlayerCount(maxPlayers(spec))
+}
+
+// resourcesForPlayerCount returns CPU/memory based on Windrose dedicated server hardware guidance.
+// See https://playwindrose.com/dedicated-server-guide
+func resourcesForPlayerCount(count int32) corev1.ResourceRequirements {
+	switch {
+	case count <= 2:
+		return podResources("2", "8Gi", "4", "10Gi")
+	case count <= 4:
+		return podResources("2", "12Gi", "4", "16Gi")
+	default:
+		return podResources("2", "16Gi", "4", "16Gi")
+	}
+}
+
+func podResources(cpuRequest, memRequest, cpuLimit, memLimit string) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resourceQuantity("2"),
-			corev1.ResourceMemory: resourceQuantity("12Gi"),
+			corev1.ResourceCPU:    resourceQuantity(cpuRequest),
+			corev1.ResourceMemory: resourceQuantity(memRequest),
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resourceQuantity("4"),
-			corev1.ResourceMemory: resourceQuantity("16Gi"),
+			corev1.ResourceCPU:    resourceQuantity(cpuLimit),
+			corev1.ResourceMemory: resourceQuantity(memLimit),
 		},
 	}
 }
