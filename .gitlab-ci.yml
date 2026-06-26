@@ -2,11 +2,8 @@
 #
 # Workflow: main or tag → build → publish windrose-operator to Harbor
 #
-# Required CI/CD variables (Settings → CI/CD → Variables):
-#   HARBOR_REGISTRY - Harbor registry URL (e.g. harbor.dataknife.net)
-#   HARBOR_PROJECT  - Harbor project name (default: library)
-#   HARBOR_USER     - Harbor username (masked)
-#   HARBOR_PASSWORD - Harbor password/token (masked, protected)
+# Harbor variables are inherited from the dk-raas/dkai GitLab group:
+#   HARBOR_REGISTRY, HARBOR_PROJECT, HARBOR_USERNAME, HARBOR_PASSWORD, DOCKER_AUTH_CONFIG
 
 stages:
   - build
@@ -31,7 +28,9 @@ build:
   <<: *build_template
   script:
     - go mod download
-    - make ci
+    # Alpine has no CGO by default; skip -race (GitHub Actions runs race tests on ubuntu)
+    - make generate manifests vet lint
+    - go test ./... -coverprofile cover.out
     - make build
   artifacts:
     paths:
@@ -64,10 +63,11 @@ publish-windrose-operator:
         exit 1
       fi
 
-      export DOCKER_CONFIG=$(mktemp -d)
-      if [ -n "${HARBOR_USER:-}" ] && [ -n "${HARBOR_PASSWORD:-}" ]; then
-        AUTH=$(printf '%s' "$HARBOR_USER:$HARBOR_PASSWORD" | base64 | tr -d '\n')
-        echo '{"auths":{"'"$HARBOR_REGISTRY"'":{"auth":"'"$AUTH"'"}}}' > "$DOCKER_CONFIG/config.json"
+      HARBOR_AUTH_USER="${HARBOR_USERNAME:-${HARBOR_USER:-}}"
+      if [ -n "$HARBOR_AUTH_USER" ] && [ -n "${HARBOR_PASSWORD:-}" ]; then
+        AUTH=$(printf '%s' "$HARBOR_AUTH_USER:$HARBOR_PASSWORD" | base64 | tr -d '\n')
+        mkdir -p ~/.docker
+        echo "{\"auths\":{\"$HARBOR_REGISTRY\":{\"auth\":\"$AUTH\"}}}" > ~/.docker/config.json
       fi
 
       echo "Building windrose-operator image..."

@@ -4,66 +4,81 @@ The operator image is built and pushed to Harbor from GitLab CI on the mirror at
 `gitlab.com/dk-raas/dkai/game-servers/windrose-operator`.
 
 GitHub Actions on `main` runs verification, then mirrors the repository to GitLab.
-GitLab CI runs `make ci`, builds the Docker image, and publishes to
+GitLab CI runs tests, builds the Docker image, and publishes to
 `harbor.dataknife.net/library/windrose-operator`.
+
+## Credentials (already configured at org/group level)
+
+No per-repo secrets or CI variables are required for normal operation.
+
+### GitHub — org secret `GITLAB_TOKEN`
+
+The DataKnifeAI organization provides `GITLAB_TOKEN` to repositories that mirror
+to GitLab. Verify access for this repo:
+
+```bash
+gh api repos/DataKnifeAI/windrose-operator/actions/organization-secrets
+```
+
+Expected: `GITLAB_TOKEN` in the `secrets` list.
+
+The **Mirror to GitLab** workflow reads `${{ secrets.GITLAB_TOKEN }}` on pushes
+to `main`. Sibling repos (for example `windrose-server-k8s`) use the same
+org secret successfully.
+
+### GitLab — group variables on `dk-raas/dkai`
+
+Harbor and registry credentials are inherited from the parent group. Verify:
+
+```bash
+glab variable list --group dk-raas/dkai
+```
+
+Expected variables include `HARBOR_REGISTRY`, `HARBOR_PROJECT`, `HARBOR_USERNAME`,
+`HARBOR_PASSWORD`, and `DOCKER_AUTH_CONFIG`. The `game-servers` subgroup and
+`windrose-operator` project do not need their own copies.
+
+Non-secret values (safe to print):
+
+```bash
+glab variable get HARBOR_REGISTRY --group dk-raas/dkai
+glab variable get HARBOR_PROJECT --group dk-raas/dkai
+```
 
 ## Authenticate GitLab CLI (`glab`)
 
-1. Create a [GitLab personal access token](https://docs.gitlab.com/user/profile/personal_access_tokens/)
-   or [group/project access token](https://docs.gitlab.com/user/project/settings/project_access_tokens/)
-   with at least **write_repository**.
-
-2. Log in:
-
-   ```bash
-   glab auth login --hostname gitlab.com
-   ```
-
-   Or for non-interactive use:
-
-   ```bash
-   export GITLAB_TOKEN="glpat-..."   # do not commit this value
-   ```
-
-3. Verify:
-
-   ```bash
-   glab auth status
-   ```
-
-## Create the mirror project (once)
-
-Already created for this repo:
+For manual pushes or project management:
 
 ```bash
-glab repo create "dk-raas/dkai/game-servers/windrose-operator" \
+glab auth login --hostname gitlab.com
+glab auth status
+```
+
+## Mirror project
+
+https://gitlab.com/dk-raas/dkai/game-servers/windrose-operator
+
+Created once with:
+
+```bash
+glab repo create windrose-operator \
+  --group dk-raas/dkai/game-servers \
   --private \
   --description "Mirror of DataKnifeAI/windrose-operator — CI builds operator image to Harbor"
 ```
 
-## GitHub repository secret
+## Image tags
 
-Add a `GITLAB_TOKEN` secret on the GitHub repository with push access to the
-mirror project. The **Mirror to GitLab** workflow uses it only to push `main`.
-
-## GitLab CI variables (Harbor)
-
-On the GitLab project (or parent group), set **masked** variables:
-
-| Variable | Example |
-|----------|---------|
-| `HARBOR_REGISTRY` | `harbor.dataknife.net` |
-| `HARBOR_PROJECT` | `library` |
-| `HARBOR_USER` | Harbor robot or user |
-| `HARBOR_PASSWORD` | Harbor token (masked, protected) |
-
-Pushes produce tags `:latest`, `:<commit-sha>`, and `:<git-tag>` when applicable.
+Pushes produce `:latest`, `:<commit-sha>`, and `:<git-tag>` when applicable.
 
 ## Manual mirror push
 
-If GitHub Actions is not yet configured:
+If GitHub Actions has not run yet:
 
 ```bash
 git remote add gitlab https://gitlab.com/dk-raas/dkai/game-servers/windrose-operator.git
-git push gitlab main --force
+git push gitlab main
 ```
+
+Note: `main` on GitLab may be branch-protected; prefer merging to GitHub `main`
+and letting the mirror workflow sync.
