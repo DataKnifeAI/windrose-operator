@@ -1,0 +1,14 @@
+apiVersion: windrose.dataknife.ai/v1alpha1
+kind: WindroseServer
+metadata:
+  name: my-windrose-server
+  namespace: default
+spec:
+  serverImage: windroseserver/windroseserver:latest
+  useDirectConnection: true
+  directConnectionServerPort: 7777
+  serverName: DataKnife Windrose
+  maxPlayerCount: 4
+  userSelectedRegion: EU
+  storageSize: 35Gi
+  serviceType: LoadBalancer

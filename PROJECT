@@ -1,0 +1,16 @@
+domain: dataknife.ai
+layout:
+  - go.kubebuilder.io/v4
+projectName: windrose-operator
+repo: github.com/DataKnifeAI/windrose-operator
+resources:
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: dataknife.ai
+    group: windrose
+    kind: WindroseServer
+    path: github.com/DataKnifeAI/windrose-operator/api/v1alpha1
+    version: v1alpha1
+version: "3"

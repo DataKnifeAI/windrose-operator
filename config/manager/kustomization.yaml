@@ -1,0 +1,7 @@
+resources:
+  - manager.yaml
+
+images:
+  - name: controller
+    newName: harbor.dataknife.net/library/windrose-operator
+    newTag: latest
