@@ -1,5 +1,5 @@
 # Mirror to GitLab after CI; GitLab CI publishes the operator image to Harbor.
-# Configure HARBOR_* variables on the GitLab project. GitHub: GITLAB_TOKEN for push only.
+# Uses org secret GITLAB_TOKEN; Harbor vars inherited from dk-raas/dkai GitLab group.
 name: Mirror to GitLab
 
 on:
