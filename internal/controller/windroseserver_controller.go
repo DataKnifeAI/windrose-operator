@@ -12,12 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	windrosev1alpha1 "github.com/DataKnifeAI/windrose-operator/api/v1alpha1"
 )
 
@@ -34,6 +36,10 @@ type WindroseServerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=tcproutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.envoyproxy.io,resources=envoyproxies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 func (r *WindroseServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -63,28 +69,34 @@ func (r *WindroseServerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 
-	pvcName, configMapName, deploymentName, serviceName := resourceNames(server.Name)
+	names := deriveNames(server)
 
-	if err := r.reconcilePVC(ctx, server, pvcName); err != nil {
+	if err := r.reconcilePVC(ctx, server, names.pvcName); err != nil {
 		return r.failStatus(ctx, server, err)
 	}
-	if err := r.reconcileConfigMap(ctx, server, configMapName); err != nil {
+	if err := r.reconcileConfigMap(ctx, server, names.configMapName); err != nil {
 		return r.failStatus(ctx, server, err)
 	}
-	if err := r.reconcileDeployment(ctx, server, pvcName, configMapName, deploymentName); err != nil {
+	if err := r.reconcileDeployment(ctx, server, names); err != nil {
 		return r.failStatus(ctx, server, err)
 	}
-	if err := r.reconcileService(ctx, server, serviceName); err != nil {
+	if err := r.reconcileClusterIPService(ctx, server, names.serviceName, serverLabels(server.Name)); err != nil {
+		return r.failStatus(ctx, server, err)
+	}
+	if err := r.reconcileClusterIPService(ctx, server, names.envoyService, envoyBackendLabels(server.Name)); err != nil {
+		return r.failStatus(ctx, server, err)
+	}
+	if err := r.reconcileEnvoyGateway(ctx, server, names); err != nil {
 		return r.failStatus(ctx, server, err)
 	}
 
 	deployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: server.Namespace}, deployment); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: names.deploymentName, Namespace: server.Namespace}, deployment); err != nil {
 		return r.failStatus(ctx, server, err)
 	}
 
-	service := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: server.Namespace}, service); err != nil {
+	gateway := &gatewayv1.Gateway{}
+	if err := r.Get(ctx, types.NamespacedName{Name: names.gatewayName, Namespace: server.Namespace}, gateway); err != nil {
 		return r.failStatus(ctx, server, err)
 	}
 
@@ -100,7 +112,7 @@ func (r *WindroseServerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	server.Status.Ready = ready
 	server.Status.InviteCode = server.Spec.InviteCode
 	server.Status.ConnectionPort = directConnectionPort(server.Spec)
-	server.Status.ConnectionAddress = connectionAddress(service)
+	server.Status.ConnectionAddress = connectionAddressFromGateway(server, gateway)
 	server.Status.Message = message
 	meta.SetStatusCondition(&server.Status.Conditions, metav1.Condition{
 		Type:               "Ready",
@@ -188,7 +200,7 @@ func (r *WindroseServerReconciler) reconcileConfigMap(ctx context.Context, serve
 func (r *WindroseServerReconciler) reconcileDeployment(
 	ctx context.Context,
 	server *windrosev1alpha1.WindroseServer,
-	pvcName, configMapName, name string,
+	names derivedNames,
 ) error {
 	port := directConnectionPort(server.Spec)
 	replicas := int32(1)
@@ -197,7 +209,7 @@ func (r *WindroseServerReconciler) reconcileDeployment(
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      names.deploymentName,
 			Namespace: server.Namespace,
 		},
 	}
@@ -214,7 +226,8 @@ func (r *WindroseServerReconciler) reconcileDeployment(
 			MatchLabels: serverLabels(server.Name),
 		}
 		deployment.Spec.Template.ObjectMeta.Labels = serverLabels(server.Name)
-		deployment.Spec.Template.Spec = corev1.PodSpec{
+
+		podSpec := corev1.PodSpec{
 			SecurityContext: &corev1.PodSecurityContext{
 				FSGroup: &runAsUser,
 			},
@@ -223,7 +236,7 @@ func (r *WindroseServerReconciler) reconcileDeployment(
 				{
 					Name:            "windrose",
 					Image:           serverImage(server.Spec),
-					ImagePullPolicy: corev1.PullIfNotPresent,
+					ImagePullPolicy: imagePullPolicy(server.Spec),
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser:                &runAsUser,
 						RunAsNonRoot:             &runAsNonRoot,
@@ -249,7 +262,7 @@ func (r *WindroseServerReconciler) reconcileDeployment(
 					Name: "saves",
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvcName,
+							ClaimName: names.pvcName,
 						},
 					},
 				},
@@ -257,24 +270,37 @@ func (r *WindroseServerReconciler) reconcileDeployment(
 					Name: "server-description",
 					VolumeSource: corev1.VolumeSource{
 						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{Name: configMapName},
+							LocalObjectReference: corev1.LocalObjectReference{Name: names.configMapName},
 						},
 					},
 				},
 			},
 		}
+
+		if len(server.Spec.ImagePullSecrets) > 0 {
+			podSpec.ImagePullSecrets = server.Spec.ImagePullSecrets
+		}
+		if len(server.Spec.NodeSelector) > 0 {
+			podSpec.NodeSelector = server.Spec.NodeSelector
+		}
+
+		deployment.Spec.Template.Spec = podSpec
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("reconcile Deployment: %w", err)
 	}
-	logf.FromContext(ctx).V(1).Info("reconciled Deployment", "operation", op, "name", name)
+	logf.FromContext(ctx).V(1).Info("reconciled Deployment", "operation", op, "name", names.deploymentName)
 	return nil
 }
 
-func (r *WindroseServerReconciler) reconcileService(ctx context.Context, server *windrosev1alpha1.WindroseServer, name string) error {
+func (r *WindroseServerReconciler) reconcileClusterIPService(
+	ctx context.Context,
+	server *windrosev1alpha1.WindroseServer,
+	name string,
+	labels map[string]string,
+) error {
 	port := directConnectionPort(server.Spec)
-	svcType := serviceType(server.Spec)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -288,32 +314,14 @@ func (r *WindroseServerReconciler) reconcileService(ctx context.Context, server 
 			return err
 		}
 
-		service.Labels = serverLabels(server.Name)
-		service.Spec.Type = svcType
+		service.Labels = labels
+		service.Spec.Type = corev1.ServiceTypeClusterIP
 		service.Spec.Selector = serverLabels(server.Name)
-		service.Spec.Ports = []corev1.ServicePort{
-			{
-				Name:       "game-tcp",
-				Port:       port,
-				TargetPort: intstr.FromInt32(port),
-				Protocol:   corev1.ProtocolTCP,
-			},
-			{
-				Name:       "game-udp",
-				Port:       port,
-				TargetPort: intstr.FromInt32(port),
-				Protocol:   corev1.ProtocolUDP,
-			},
-		}
-
-		if svcType == corev1.ServiceTypeNodePort && server.Spec.NodePort != 0 {
-			service.Spec.Ports[0].NodePort = server.Spec.NodePort
-			service.Spec.Ports[1].NodePort = server.Spec.NodePort
-		}
+		service.Spec.Ports = gameServicePorts(port)
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("reconcile Service: %w", err)
+		return fmt.Errorf("reconcile Service %s: %w", name, err)
 	}
 	logf.FromContext(ctx).V(1).Info("reconciled Service", "operation", op, "name", name)
 	return nil
@@ -344,6 +352,10 @@ func (r *WindroseServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&gatewayv1.Gateway{}).
+		Owns(&gatewayv1alpha2.TCPRoute{}).
+		Owns(&gatewayv1alpha2.UDPRoute{}).
+		Owns(&egv1a1.EnvoyProxy{}).
 		Complete(r)
 }
 
@@ -355,20 +367,10 @@ func serverLabels(name string) map[string]string {
 	}
 }
 
-func connectionAddress(service *corev1.Service) string {
-	if service.Spec.Type == corev1.ServiceTypeLoadBalancer && len(service.Status.LoadBalancer.Ingress) > 0 {
-		ingress := service.Status.LoadBalancer.Ingress[0]
-		if ingress.IP != "" {
-			return ingress.IP
-		}
-		if ingress.Hostname != "" {
-			return ingress.Hostname
-		}
-	}
-	if service.Spec.Type == corev1.ServiceTypeNodePort && len(service.Spec.Ports) > 0 {
-		return "<node-ip>"
-	}
-	return service.Spec.ClusterIP
+func envoyBackendLabels(instanceName string) map[string]string {
+	labels := serverLabels(instanceName)
+	labels["app.kubernetes.io/component"] = "envoy-backend"
+	return labels
 }
 
 func conditionStatus(ready bool) metav1.ConditionStatus {
