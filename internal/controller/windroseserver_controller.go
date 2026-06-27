@@ -19,8 +19,8 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
-	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	windrosev1alpha1 "github.com/DataKnifeAI/windrose-operator/api/v1alpha1"
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 )
 
 // WindroseServerReconciler reconciles a WindroseServer object.
@@ -225,7 +225,7 @@ func (r *WindroseServerReconciler) reconcileDeployment(
 		deployment.Spec.Selector = &metav1.LabelSelector{
 			MatchLabels: serverLabels(server.Name),
 		}
-		deployment.Spec.Template.ObjectMeta.Labels = serverLabels(server.Name)
+		deployment.Spec.Template.Labels = serverLabels(server.Name)
 
 		podSpec := corev1.PodSpec{
 			SecurityContext: &corev1.PodSecurityContext{

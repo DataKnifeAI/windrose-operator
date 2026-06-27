@@ -6,10 +6,10 @@ on:
 
 jobs:
   test:
-    name: Run on Ubuntu
+    name: go test
     runs-on: ubuntu-latest
     steps:
-      - name: Clone the code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
@@ -17,8 +17,14 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Running Tests
+      - name: Verify generated code
         run: |
           go mod tidy
           make generate manifests
-          make test
+          git diff --exit-code
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: make test

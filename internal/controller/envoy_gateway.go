@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	windrosev1alpha1 "github.com/DataKnifeAI/windrose-operator/api/v1alpha1"
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 func (r *WindroseServerReconciler) reconcileEnvoyGateway(
@@ -118,7 +118,7 @@ func (r *WindroseServerReconciler) reconcileGateway(
 			Listeners: []gatewayv1.Listener{
 				{
 					Name:     gatewayv1.SectionName(gatewayListenerGameTCP),
-					Port:     gatewayv1.PortNumber(port),
+					Port:     port,
 					Protocol: gatewayv1.TCPProtocolType,
 					AllowedRoutes: &gatewayv1.AllowedRoutes{
 						Namespaces: &gatewayv1.RouteNamespaces{
@@ -128,7 +128,7 @@ func (r *WindroseServerReconciler) reconcileGateway(
 				},
 				{
 					Name:     gatewayv1.SectionName(gatewayListenerGameUDP),
-					Port:     gatewayv1.PortNumber(port),
+					Port:     port,
 					Protocol: gatewayv1.UDPProtocolType,
 					AllowedRoutes: &gatewayv1.AllowedRoutes{
 						Namespaces: &gatewayv1.RouteNamespaces{
@@ -181,7 +181,7 @@ func (r *WindroseServerReconciler) reconcileTCPRoute(
 						{
 							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: gatewayv1.ObjectName(names.envoyService),
-								Port: ptr.To(gatewayv1.PortNumber(port)),
+								Port: ptr.To(port),
 							},
 						},
 					},
@@ -231,7 +231,7 @@ func (r *WindroseServerReconciler) reconcileUDPRoute(
 						{
 							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: gatewayv1.ObjectName(names.envoyService),
-								Port: ptr.To(gatewayv1.PortNumber(port)),
+								Port: ptr.To(port),
 							},
 						},
 					},

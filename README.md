@@ -214,19 +214,24 @@ docker run --user ue_user --name WindroseServer \
 
 ## Development
 
-Requires Go 1.25+.
+Requires Go 1.25+ and [golangci-lint](https://golangci-lint.run/) for local linting.
 
 ```shell
 make generate manifests   # CRD, RBAC, deepcopy
-make test
-make build              # bin/manager
-make run                # local controller
+make test                 # unit tests with race detector
+make lint                 # golangci-lint
+make ci                   # generate, vet, lint, and test
+make build                # bin/manager
+make run                  # local controller
 make docker-build IMG=harbor.dataknife.net/library/windrose-operator:latest
 ```
+
+CI runs lint and tests on every push and pull request.
 
 ## Related projects
 
 - [DataKnifeAI/windrose-server-k8s](https://github.com/DataKnifeAI/windrose-server-k8s) — Wine-based image and Kustomize manifests
+- [GitLab mirror](docs/GITLAB_MIRROR.md) — CI builds `harbor.dataknife.net/library/windrose-operator`
 - [Windrose Dedicated Server Guide](https://playwindrose.com/dedicated-server-guide)
 - [windroseserver/windroseserver on Docker Hub](https://hub.docker.com/r/windroseserver/windroseserver)
 

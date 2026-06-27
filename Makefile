@@ -29,7 +29,18 @@ build: generate
 
 .PHONY: test
 test: generate
-	go test ./... -coverprofile cover.out
+	go test ./... -race -coverprofile cover.out
+
+.PHONY: lint
+lint:
+	golangci-lint run ./...
+
+.PHONY: lint-fix
+lint-fix:
+	golangci-lint run --fix ./...
+
+.PHONY: ci
+ci: generate manifests vet lint test
 
 .PHONY: run
 run: manifests generate
