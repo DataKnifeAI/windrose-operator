@@ -1,5 +1,8 @@
 # Windrose Operator
 
+![Windrose Kubernetes operator](docs/assets/windrose-operator-hero.jpg)
+
+
 Kubernetes operator for [Windrose](https://playwindrose.com) dedicated game servers using the official Linux image [`windroseserver/windroseserver`](https://hub.docker.com/r/windroseserver/windroseserver).
 
 This project complements [windrose-server-k8s](https://github.com/DataKnifeAI/windrose-server-k8s), which packages a Wine-based server image and static Kustomize manifests. The operator:
