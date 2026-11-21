@@ -165,6 +165,11 @@ spec:
                 description: Password protects the server when set. Leave empty for
                   a public server.
                 type: string
+              persistentServerId:
+                description: |-
+                  PersistentServerId preserves server/world identity when migrating from Wine deployments.
+                  Written to ServerDescription.json as PersistentServerId when set.
+                type: string
               resources:
                 description: |-
                   Resources for the game server container.
@@ -257,6 +262,11 @@ spec:
                 - CIS
                 - EU
                 - ""
+                type: string
+              worldIslandId:
+                description: |-
+                  WorldIslandId preserves the world island identity when migrating from Wine deployments.
+                  Written to ServerDescription.json as WorldIslandId when set.
                 type: string
             required:
             - gateway

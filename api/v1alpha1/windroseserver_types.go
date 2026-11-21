@@ -123,6 +123,16 @@ type WindroseServerSpec struct {
 	// +optional
 	AutoLoadLatestBackupIfHasBroken *bool `json:"autoLoadLatestBackupIfHasBroken,omitempty"`
 
+	// PersistentServerId preserves server/world identity when migrating from Wine deployments.
+	// Written to ServerDescription.json as PersistentServerId when set.
+	// +optional
+	PersistentServerId string `json:"persistentServerId,omitempty"`
+
+	// WorldIslandId preserves the world island identity when migrating from Wine deployments.
+	// Written to ServerDescription.json as WorldIslandId when set.
+	// +optional
+	WorldIslandId string `json:"worldIslandId,omitempty"`
+
 	// StorageSize is the requested PVC capacity for world saves.
 	// +kubebuilder:default="35Gi"
 	// +optional

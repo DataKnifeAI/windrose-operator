@@ -37,6 +37,45 @@ func TestBuildServerDescriptionDirectConnection(t *testing.T) {
 	}
 }
 
+func TestBuildServerDescriptionPersistentWorldIDs(t *testing.T) {
+	spec := windrosev1alpha1.WindroseServerSpec{
+		Gateway:            windrosev1alpha1.GatewayConfig{Address: "192.168.14.186"},
+		PersistentServerId: "abc-server-id",
+		WorldIslandId:      "island-42",
+	}
+
+	content, err := buildServerDescription(spec)
+	if err != nil {
+		t.Fatalf("buildServerDescription() error = %v", err)
+	}
+	body := string(content)
+	for _, want := range []string{
+		`"PersistentServerId": "abc-server-id"`,
+		`"WorldIslandId": "island-42"`,
+	} {
+		if !contains(body, want) {
+			t.Fatalf("expected %q in %s", want, body)
+		}
+	}
+}
+
+func TestBuildServerDescriptionOmitsEmptyWorldIDs(t *testing.T) {
+	spec := windrosev1alpha1.WindroseServerSpec{
+		Gateway: windrosev1alpha1.GatewayConfig{Address: "192.168.14.186"},
+	}
+
+	content, err := buildServerDescription(spec)
+	if err != nil {
+		t.Fatalf("buildServerDescription() error = %v", err)
+	}
+	body := string(content)
+	for _, mustNot := range []string{"PersistentServerId", "WorldIslandId"} {
+		if contains(body, mustNot) {
+			t.Fatalf("did not expect %q in %s", mustNot, body)
+		}
+	}
+}
+
 func TestResourcesForPlayerCount(t *testing.T) {
 	tests := []struct {
 		players  int32
