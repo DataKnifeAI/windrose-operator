@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	windrosev1alpha1 "github.com/DataKnifeAI/windrose-operator/api/v1alpha1"
 	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
@@ -353,8 +352,8 @@ func (r *WindroseServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&gatewayv1.Gateway{}).
-		Owns(&gatewayv1alpha2.TCPRoute{}).
-		Owns(&gatewayv1alpha2.UDPRoute{}).
+		Owns(&gatewayv1.TCPRoute{}).
+		Owns(&gatewayv1.UDPRoute{}).
 		Owns(&egv1a1.EnvoyProxy{}).
 		Complete(r)
 }

@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 func testScheme(t *testing.T) *runtime.Scheme {
@@ -26,7 +25,6 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(windrosev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
-	utilruntime.Must(gatewayv1alpha2.Install(scheme))
 	utilruntime.Must(egv1a1.AddToScheme(scheme))
 	return scheme
 }
@@ -117,8 +115,8 @@ func TestReconcileCreatesManagedResources(t *testing.T) {
 	objectExists(t, reconciler.Client, ns, names.envoyService, &corev1.Service{})
 	objectExists(t, reconciler.Client, ns, names.gatewayName, &gatewayv1.Gateway{})
 	objectExists(t, reconciler.Client, ns, names.envoyProxyName, &egv1a1.EnvoyProxy{})
-	objectExists(t, reconciler.Client, ns, names.tcpRouteName, &gatewayv1alpha2.TCPRoute{})
-	objectExists(t, reconciler.Client, ns, names.udpRouteName, &gatewayv1alpha2.UDPRoute{})
+	objectExists(t, reconciler.Client, ns, names.tcpRouteName, &gatewayv1.TCPRoute{})
+	objectExists(t, reconciler.Client, ns, names.udpRouteName, &gatewayv1.UDPRoute{})
 
 	deployment := &appsv1.Deployment{}
 	objectExists(t, reconciler.Client, ns, names.deploymentName, deployment)
