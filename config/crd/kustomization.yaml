@@ -1,2 +1,2 @@
 resources:
-  - windrose.dataknife.ai_windroseservers.yaml
+  - bases/windrose.dataknife.ai_windroseservers.yaml
