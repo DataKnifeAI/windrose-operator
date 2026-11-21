@@ -360,7 +360,7 @@ func (r *WindroseServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func serverLabels(name string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":       "windrose-server",
+		"app.kubernetes.io/name":       appNameWindroseServer,
 		"app.kubernetes.io/instance":   name,
 		"app.kubernetes.io/managed-by": "windrose-operator",
 	}

@@ -19,4 +19,6 @@ const (
 
 	gatewayListenerGameTCP = "game-tcp"
 	gatewayListenerGameUDP = "game-udp"
+
+	appNameWindroseServer = "windrose-server"
 )

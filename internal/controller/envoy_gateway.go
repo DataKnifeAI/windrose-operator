@@ -180,7 +180,7 @@ func (r *WindroseServerReconciler) reconcileTCPRoute(
 						{
 							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: gatewayv1.ObjectName(names.envoyService),
-								Port: ptr.To(gatewayv1.PortNumber(port)),
+								Port: ptr.To(port),
 							},
 						},
 					},
@@ -230,7 +230,7 @@ func (r *WindroseServerReconciler) reconcileUDPRoute(
 						{
 							BackendObjectReference: gatewayv1.BackendObjectReference{
 								Name: gatewayv1.ObjectName(names.envoyService),
-								Port: ptr.To(gatewayv1.PortNumber(port)),
+								Port: ptr.To(port),
 							},
 						},
 					},

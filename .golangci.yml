@@ -26,6 +26,13 @@ linters:
       - linters:
           - revive
         path: api/v1alpha1/zz_generated.deepcopy.go
+      - linters:
+          - staticcheck
+        text: "SA1019: scheme.Builder is deprecated"
+        path: api/v1alpha1/groupversion_info.go
+      - linters:
+          - goconst
+        path: _test\.go
     paths:
       - third_party$
       - bin$
