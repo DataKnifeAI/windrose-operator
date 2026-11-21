@@ -29,6 +29,8 @@ type serverDescriptionPersistent struct {
 	DirectConnectionServerPort      int32  `json:"DirectConnectionServerPort"`
 	DirectConnectionProxyAddress    string `json:"DirectConnectionProxyAddress"`
 	AutoLoadLatestBackupIfHasBroken bool   `json:"AutoLoadLatestBackupIfHasBroken"`
+	PersistentServerId              string `json:"PersistentServerId,omitempty"`
+	WorldIslandId                   string `json:"WorldIslandId,omitempty"`
 }
 
 type derivedNames struct {
@@ -201,6 +203,8 @@ func buildServerDescription(spec windrosev1alpha1.WindroseServerSpec) ([]byte, e
 			DirectConnectionServerPort:      directConnectionPort(spec),
 			DirectConnectionProxyAddress:    directConnectionProxyAddress(spec),
 			AutoLoadLatestBackupIfHasBroken: autoBackup,
+			PersistentServerId:              spec.PersistentServerId,
+			WorldIslandId:                   spec.WorldIslandId,
 		},
 	}
 
